@@ -46,6 +46,9 @@ function Sbody:init(world, x, y, r, s)
 	self.nodes[1].body:getX(), self.nodes[1].body:getY(), false);
 	self.nodes[i].joint3 = j;
 
+	self.pos2 = {};
+	self.pos3 = {};
+
 	if s then
 		self.smooth = s;
 	else
@@ -77,58 +80,56 @@ function Sbody:draw(type)
 		table.insert(pos, v.body:getY());
 	end
 
-	for i=1,2 do
-		pos = tesselate(pos);
-	end
+	tessellate(pos, self.pos2);
+	tessellate(self.pos2, self.pos3);
 
 	love.graphics.setLineStyle("smooth");
 	love.graphics.setLineWidth(20);
 
 	if type == "line" then
-		love.graphics.polygon("line", pos);
+		love.graphics.polygon("line", self.pos3);
 	else
-		love.graphics.polygon("fill", pos);
-		love.graphics.polygon("line", pos);
+		love.graphics.polygon("fill", self.pos3);
+		love.graphics.polygon("line", self.pos3);
 	end
 end
 
---tesselate function by Amadiro/Jonathan Ringstad
-function tesselate(vertices)
+--tessellate function by Amadiro/Jonathan Ringstad
+function tessellate(vertices, new_vertices)
    MIX_FACTOR = .5
-   new_vertices = {}
+   new_vertices[#vertices*2] = 0
    for i=1,#vertices,2 do
-
-      -- push original vertex
-      table.insert(new_vertices, vertices[i])
-      table.insert(new_vertices, vertices[i+1])
-
+      local newindex = 2*i
+      -- indexing brackets:
+      -- [1, *2*, 3, 4], [5, *6*, 7, 8]
+      -- bracket center: 2*i
+      -- bracket start: 2*1 - 1
+      new_vertices[newindex - 1] = vertices[i];
+      new_vertices[newindex] = vertices[i+1]
       if not (i+1 == #vertices) then
-	 -- push new vertex: x'_n = (x_n + x_(n+1) / 2)
 	 -- x coordinate
-	 table.insert(new_vertices, (vertices[i] + vertices[i+2])/2)
+	 new_vertices[newindex + 1] = (vertices[i] + vertices[i+2])/2
 	 -- y coordinate
-	 table.insert(new_vertices, (vertices[i+1] + vertices[i+3])/2)
+	 new_vertices[newindex + 2] = (vertices[i+1] + vertices[i+3])/2
       else
 	 -- x coordinate
-	 table.insert(new_vertices, (vertices[i] + vertices[1])/2)
+	 new_vertices[newindex + 1] = (vertices[i] + vertices[1])/2
 	 -- y coordinate
-	 table.insert(new_vertices, (vertices[i+1] + vertices[2])/2)
+	 new_vertices[newindex + 2] = (vertices[i+1] + vertices[2])/2
       end
    end
-   
-   -- re-position old new_vertices
+
    for i = 1,#new_vertices,4 do
       if i == 1 then
-	 -- x coordinate
-	 new_vertices[1] = MIX_FACTOR*(new_vertices[#new_vertices - 1] + new_vertices[3])/2 + (1 - MIX_FACTOR)*new_vertices[1]
-	 -- y coordinate
-	 new_vertices[2] = MIX_FACTOR*(new_vertices[#new_vertices - 0] + new_vertices[4])/2 + (1 - MIX_FACTOR)*new_vertices[2]
+   	 -- x coordinate
+   	 new_vertices[1] = MIX_FACTOR*(new_vertices[#new_vertices - 1] + new_vertices[3])/2 + (1 - MIX_FACTOR)*new_vertices[1]
+   	 -- y coordinate
+   	 new_vertices[2] = MIX_FACTOR*(new_vertices[#new_vertices - 0] + new_vertices[4])/2 + (1 - MIX_FACTOR)*new_vertices[2]
       else
-	 -- x coordinate
-	 new_vertices[i] = MIX_FACTOR*(new_vertices[i - 2] + new_vertices[i + 2])/2 + (1 - MIX_FACTOR)*new_vertices[i]
-	 -- y coordinate
-	 new_vertices[i + 1] = MIX_FACTOR*(new_vertices[i - 1] + new_vertices[i + 3])/2 + (1 - MIX_FACTOR)*new_vertices[i + 1]
+   	 -- x coordinate
+   	 new_vertices[i] = MIX_FACTOR*(new_vertices[i - 2] + new_vertices[i + 2])/2 + (1 - MIX_FACTOR)*new_vertices[i]
+   	 -- y coordinate
+   	 new_vertices[i + 1] = MIX_FACTOR*(new_vertices[i - 1] + new_vertices[i + 3])/2 + (1 - MIX_FACTOR)*new_vertices[i + 1]
       end
    end
-   return new_vertices
 end
