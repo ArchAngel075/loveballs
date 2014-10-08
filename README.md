@@ -5,7 +5,7 @@ A simple love2d softbody lib
 
 
 A quick example
-'''lua
+```lua
     require "loveballs/loveballs"
 
     function love.load()
