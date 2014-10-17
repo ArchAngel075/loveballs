@@ -4,14 +4,13 @@
 require "loveballs/class"
 
 Sbody = newclass("Sbody");
-function Sbody:init(world, x, y, r, s)
+function Sbody:init(world, x, y, r, s, tess)
 	local world = world;
 	self.sourceBody = love.physics.newBody(world, x, y, "dynamic");
-	self.source = love.physics.newCircleShape(r/4);
-	self.fixture = love.physics.newFixture(self.sourceBody, self.source);
+	self.sourceShape = love.physics.newCircleShape(r/4);
+	self.fixture = love.physics.newFixture(self.sourceBody, self.sourceShape);
 
 	self.nodeShape = love.physics.newCircleShape(6);
-
 	self.nodes = {};
 
 	local nodes = r;
@@ -26,7 +25,7 @@ function Sbody:init(world, x, y, r, s)
 		f:setRestitution(0);
 		b:setAngularDamping(50);
 		
-		local j = love.physics.newDistanceJoint(self.sourceBody, b, x, y, posx, posy, true);
+		local j = love.physics.newDistanceJoint(self.sourceBody, b, posx, posy, posx, posy, true);
 		j:setDampingRatio(0.1);
 		j:setFrequency(12*(20/r));
 
@@ -46,8 +45,11 @@ function Sbody:init(world, x, y, r, s)
 	self.nodes[1].body:getX(), self.nodes[1].body:getY(), false);
 	self.nodes[i].joint3 = j;
 
-	self.pos2 = {};
-	self.pos3 = {};
+	self.tess = {};
+	if not tess then tess = 2; end
+	for i=1,tess do
+		self.tess[i] = {};
+	end
 
 	if s then
 		self.smooth = s;
@@ -57,6 +59,20 @@ function Sbody:init(world, x, y, r, s)
 		else
 			self.smooth = 2;
 		end
+	end
+
+	self.dead = false;
+end
+
+function Sbody:destroy()
+	if not self.dead then
+		for i = #self.nodes, 1, -1 do
+			self.nodes[i].body:destroy();
+			self.nodes[i] = nil;
+		end
+
+		self.sourceBody:destroy();
+		self.dead = true;
 	end
 end
 
@@ -72,25 +88,33 @@ function Sbody:setDamping(d)
 	end
 end
 
-function Sbody:draw(type)
-	local pos = {};
-	for i = 1, #self.nodes, self.smooth do
-		v = self.nodes[i];
-		table.insert(pos, v.body:getX());
-		table.insert(pos, v.body:getY());
-	end
+function Sbody:draw(type, width)
+	if not self.dead then
+		if not width then
+			width = 20;
+		end
+		local pos = {};
+		for i = 1, #self.nodes, self.smooth do
+			v = self.nodes[i];
+			table.insert(pos, v.body:getX());
+			table.insert(pos, v.body:getY());
+		end
 
-	tessellate(pos, self.pos2);
-	tessellate(self.pos2, self.pos3);
+		tessellate(pos, self.tess[1]);
+		for i=1,#self.tess - 1 do
+			tessellate(self.tess[i], self.tess[i+1]);
+		end
 
-	love.graphics.setLineStyle("smooth");
-	love.graphics.setLineWidth(20);
 
-	if type == "line" then
-		love.graphics.polygon("line", self.pos3);
-	else
-		love.graphics.polygon("fill", self.pos3);
-		love.graphics.polygon("line", self.pos3);
+		love.graphics.setLineStyle("smooth");
+		love.graphics.setLineWidth(width);
+
+		if type == "line" then
+			love.graphics.polygon("line", self.tess[#self.tess]);
+		else
+			love.graphics.polygon("fill", self.tess[#self.tess]);
+			love.graphics.polygon("line", self.tess[#self.tess]);
+		end
 	end
 end
 
