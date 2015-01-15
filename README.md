@@ -6,7 +6,7 @@ A simple love2d softbody lib
 
 A quick example
 ```lua
-    require "loveballs/loveballs"
+    require "loveballs"
 
     function love.load()
        --I've found these to be optimal settings
