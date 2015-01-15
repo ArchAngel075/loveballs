@@ -5,15 +5,24 @@ require "loveballs/class"
 
 Sbody = newclass("Sbody");
 function Sbody:init(world, x, y, r, s, tess)
+	self.smooth = s or 2;
+	self.tess = {};
+	local tess = tess or 2;
+	for i=1, tess do
+		self.tess[i] = {};
+	end
+
 	local world = world;
 	self.sourceBody = love.physics.newBody(world, x, y, "dynamic");
 	self.sourceShape = love.physics.newCircleShape(r/4);
 	self.fixture = love.physics.newFixture(self.sourceBody, self.sourceShape);
 
+	self.fixture:setMask(1);
+
 	self.nodeShape = love.physics.newCircleShape(6);
 	self.nodes = {};
 
-	local nodes = r;
+	local nodes = r/2;
 
 	for node = 1, nodes do
 		local angle = (2*math.pi)/nodes*node;
@@ -44,22 +53,6 @@ function Sbody:init(world, x, y, r, s, tess)
 	local j = love.physics.newDistanceJoint(self.nodes[i].body, self.nodes[1].body, self.nodes[i].body:getX(), self.nodes[i].body:getY(),
 	self.nodes[1].body:getX(), self.nodes[1].body:getY(), false);
 	self.nodes[i].joint3 = j;
-
-	self.tess = {};
-	if not tess then tess = 2; end
-	for i=1,tess do
-		self.tess[i] = {};
-	end
-
-	if s then
-		self.smooth = s;
-	else
-		if r > 25 then
-			self.smooth = 6;
-		else
-			self.smooth = 2;
-		end
-	end
 
 	self.dead = false;
 end
