@@ -1,4 +1,5 @@
---Softbody lib by Shorefire/Steven
+--Original Softbody lib by Shorefire/Steven
+--Modifications made by ArchAngel075/Jaco
 --tesselate function by Amadiro/Jonathan Ringstad
 
 require "loveballs/class"
@@ -57,6 +58,25 @@ function Sbody:init(world, x, y, r, s, tess)
 	self.dead = false;
 end
 
+function Sbody:update()
+  if not self.dead then
+		local pos = {};
+		for i = 1, #self.nodes, self.smooth do
+			v = self.nodes[i];
+			table.insert(pos, v.body:getX());
+			table.insert(pos, v.body:getY());
+		end
+
+		tessellate(pos, self.tess[1]);
+		for i=1,#self.tess - 1 do
+			tessellate(self.tess[i], self.tess[i+1]);
+		end
+    
+    return self.tess[#self.tess]
+    
+  end
+end
+
 function Sbody:destroy()
 	if not self.dead then
 		for i = #self.nodes, 1, -1 do
@@ -75,6 +95,14 @@ function Sbody:setFrequency(f)
 	end
 end
 
+function Sbody:getFrequency()
+  local count = 0
+	for i,v in pairs(self.nodes) do
+		count = count+v.joint:getFrequency();
+	end
+  return count/#self.nodes
+end
+
 function Sbody:setDamping(d)
 	for i,v in pairs(self.nodes) do
 		v.joint:setDampingRatio(d);
@@ -86,18 +114,8 @@ function Sbody:draw(type, width)
 		if not width then
 			width = 20;
 		end
-		local pos = {};
-		for i = 1, #self.nodes, self.smooth do
-			v = self.nodes[i];
-			table.insert(pos, v.body:getX());
-			table.insert(pos, v.body:getY());
-		end
-
-		tessellate(pos, self.tess[1]);
-		for i=1,#self.tess - 1 do
-			tessellate(self.tess[i], self.tess[i+1]);
-		end
-
+    
+    self:update() --update tessellation
 
 		love.graphics.setLineStyle("smooth");
 		love.graphics.setLineWidth(width);
@@ -109,6 +127,11 @@ function Sbody:draw(type, width)
 			love.graphics.polygon("line", self.tess[#self.tess]);
 		end
 	end
+  love.graphics.setLineWidth(1)
+end
+
+function Sbody:getPoints()
+ return self.tess[#self.tess]
 end
 
 --tessellate function by Amadiro/Jonathan Ringstad
