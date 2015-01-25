@@ -1,4 +1,6 @@
 loveballs
+
+Original : https://github.com/shorefire/loveballs
 =========
 
 A simple love2d softbody lib
@@ -27,6 +29,8 @@ A quick example
 
     function love.update(dt)
        world:update(dt)
+       soft1:update()
+       soft2:update()
     end
 
     function love.draw()
