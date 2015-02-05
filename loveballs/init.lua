@@ -1,137 +1,231 @@
---Original Softbody lib by Shorefire/Steven
---Modifications made by ArchAngel075/Jaco
+--Softbody lib by Shorefire/Steven
 --tesselate function by Amadiro/Jonathan Ringstad
+local path = ...;
 
-require "loveballs/class"
+require(path.."/class");
 
-Sbody = newclass("Sbody");
-function Sbody:init(world, x, y, r, s, tess)
-	self.smooth = s or 2;
-	self.tess = {};
-	local tess = tess or 2;
-	for i=1, tess do
-		self.tess[i] = {};
-	end
+Softbody = newclass("Softbody");
+function Softbody:init(typeVar, ...)
+  local typeVar = typeVar or "circle"
+  local args = {...}
+  local points, nodeFrequency, world, x, y, r, s, t
+  
+  if typeVar == "circle" then
+   world, x, y, r, s, t = args[1],args[2],args[3],args[4],args[5],args[6]
+  elseif typeVar == "polygon" then
+   points, nodeFrequency, world, x, y, r, s, t = args[1],args[2],args[3],args[4],args[5],args[6],args[7],args[8]
+  end
+  
+	--create center body
+	self.centerBody = love.physics.newBody(world, x, y, "dynamic");
+	self.centerShape = love.physics.newCircleShape(r/4);
+	self.centerfixture = love.physics.newFixture(self.centerBody, self.centerShape);
+	self.centerfixture:setMask(1);
 
-	local world = world;
-	self.sourceBody = love.physics.newBody(world, x, y, "dynamic");
-	self.sourceShape = love.physics.newCircleShape(r/4);
-	self.fixture = love.physics.newFixture(self.sourceBody, self.sourceShape);
-
-	self.fixture:setMask(1);
-
+	--create 'nodes' (outer bodies) & connect to center body
 	self.nodeShape = love.physics.newCircleShape(6);
 	self.nodes = {};
 
-	local nodes = r/2;
-
-	for node = 1, nodes do
-		local angle = (2*math.pi)/nodes*node;
-		local posx = x+r*math.cos(angle);
-		local posy = y+r*math.sin(angle);
-		local b = love.physics.newBody(world, posx, posy, "dynamic");
-		local f = love.physics.newFixture(b, self.nodeShape);
-		f:setFriction(30);
-		f:setRestitution(0);
-		b:setAngularDamping(50);
-		
-		local j = love.physics.newDistanceJoint(self.sourceBody, b, posx, posy, posx, posy, true);
-		j:setDampingRatio(0.1);
-		j:setFrequency(12*(20/r));
-
-		table.insert(self.nodes, {body = b, fixture = f, joint = j});
-	end
-
+	--CONSTRUCTOR
+  if typeVar == "circle" then
+    self:constructCircle(world,x,y,r)
+  elseif typeVar == "polygon" then
+    self:constructFromPoints(world,x,y,nodeFrequency,points)
+  end
+	--connect nodes to eachother
 	for i = 1, #self.nodes do
 		if i < #self.nodes then
 			local j = love.physics.newDistanceJoint(self.nodes[i].body, self.nodes[i+1].body, self.nodes[i].body:getX(), self.nodes[i].body:getY(),
 			self.nodes[i+1].body:getX(), self.nodes[i+1].body:getY(), false);
 			self.nodes[i].joint2 = j;
+		else
+			local j = love.physics.newDistanceJoint(self.nodes[i].body, self.nodes[1].body, self.nodes[i].body:getX(), self.nodes[i].body:getY(),
+			self.nodes[1].body:getX(), self.nodes[1].body:getY(), false);
+			self.nodes[i].joint3 = j;
 		end
 	end
 
-	local i = #self.nodes;
-	local j = love.physics.newDistanceJoint(self.nodes[i].body, self.nodes[1].body, self.nodes[i].body:getX(), self.nodes[i].body:getY(),
-	self.nodes[1].body:getX(), self.nodes[1].body:getY(), false);
-	self.nodes[i].joint3 = j;
+	--set tesselation and smoothing
+	if s > 2 then
+		s = 2;
+	end
+	self.smooth = s or 2;
+
+	local tess = t or 4;
+	self.tess = {};
+	for i=1,tess do
+		self.tess[i] = {};
+	end
 
 	self.dead = false;
 end
 
-function Sbody:update()
-  if not self.dead then
-		local pos = {};
-		for i = 1, #self.nodes, self.smooth do
-			v = self.nodes[i];
-			table.insert(pos, v.body:getX());
-			table.insert(pos, v.body:getY());
-		end
+function Softbody:constructCircle(world, x, y, r)
+  local nodes = r/2;
 
-		tessellate(pos, self.tess[1]);
-		for i=1,#self.tess - 1 do
-			tessellate(self.tess[i], self.tess[i+1]);
-		end
-    
-    return self.tess[#self.tess]
-    
-  end
-end
+	for node = 1, nodes do
+		local angle = (2*math.pi)/nodes*node;
+		
+		local posx = x+r*math.cos(angle);
+		local posy = y+r*math.sin(angle);
 
-function Sbody:destroy()
-	if not self.dead then
-		for i = #self.nodes, 1, -1 do
-			self.nodes[i].body:destroy();
-			self.nodes[i] = nil;
-		end
+		local b = love.physics.newBody(world, posx, posy, "dynamic");
+		b:setAngularDamping(50);
+		
+		local f = love.physics.newFixture(b, self.nodeShape);
+		f:setFriction(30);
+		f:setRestitution(0);
+		
+		local j = love.physics.newDistanceJoint(self.centerBody, b, posx, posy, posx, posy, false);
+		j:setDampingRatio(0.1);
+		j:setFrequency(12*(20/r));
 
-		self.sourceBody:destroy();
-		self.dead = true;
+		table.insert(self.nodes, {body = b, fixture = f, joint = j});
 	end
 end
 
-function Sbody:setFrequency(f)
+function Softbody:constructFromPoints(world,px,py,nodeRadius,points)
+  --[[
+   construct nodes from points {...}
+    Format x1,y1,x2,y2,x3,y3,...
+    to cosntruct we iterate from point to point creating a node every nodeRadius units and saving them in order.
+  --]]
+  local nodeRadius = nodeRadius or 8 --default of 8.
+  local points = points or error("no points?")
+
+  local nodes = {}
+  local pPairs = {}
+  --first compile all points into a series of distance to pairs.
+  for i = 1,#points,2 do
+    local x = points[i]
+    local y = points[i+1]
+    pPairs[#pPairs+1] = {
+     x=x,
+     y=y,
+    }
+  end
+  
+  --now iterate between points to 
+  local loop = true
+  local i = 1
+  while loop do
+    local p1 = pPairs[i]
+    local p2 = pPairs[i+1] or false
+    if not p2 then loop = false ; p2 = pPairs[1] end -- last point was reached
+    local dst = math.sqrt( ( p1.x - p2.x ) * ( p1.x - p2.x ) + ( p1.y - p2.y ) * ( p1.y - p2.y ) )
+    
+    local angle = math.atan2(p2.y-p1.y,p2.x-p1.x)
+    --loop between them
+    for dx = 0,dst,nodeRadius do
+      nodes[#nodes+1] = {
+       x =  dx*math.cos(angle)+p1.x + px ,
+       y =  dx*math.sin(angle)+p1.y + py ,
+      }
+      --later we will add the physics, getting the points is important as is.
+    end 
+    i = i+1
+  end
+  
+  ---
+  local r = nodeRadius
+  
+  for k,v in pairs(nodes) do
+    
+    local posx = v.x
+    local posy = v.y
+    
+    local b = love.physics.newBody(world, posx, posy, "dynamic")
+		b:setAngularDamping(50)
+		
+		local f = love.physics.newFixture(b, self.nodeShape)
+		f:setFriction(30)
+		f:setRestitution(0)
+		
+		local j = love.physics.newDistanceJoint(self.centerBody, b, posx, posy, posx, posy, false)
+		j:setDampingRatio(0.1)
+		j:setFrequency(12*(20/r))
+
+		table.insert(self.nodes, {body = b, fixture = f, joint = j})
+  end
+end
+
+function Softbody:update()
+	--update tesselation (for drawing)
+	local pos = {};
+	for i = 1, #self.nodes, self.smooth do
+		v = self.nodes[i];
+
+		table.insert(pos, v.body:getX());
+		table.insert(pos, v.body:getY());
+	end
+
+	tessellate(pos, self.tess[1]);
+	for i=1,#self.tess - 1 do
+		tessellate(self.tess[i], self.tess[i+1]);
+	end
+end
+
+function Softbody:destroy()
+	if self.dead then
+		return;
+	end
+
+	for i = #self.nodes, 1, -1 do
+		self.nodes[i].body:destroy();
+		self.nodes[i] = nil;
+	end
+
+	self.sourceBody:destroy();
+	self.dead = true;
+end
+
+function Softbody:setFrequency(f)
 	for i,v in pairs(self.nodes) do
 		v.joint:setFrequency(f);
 	end
 end
 
-function Sbody:getFrequency()
-  local count = 0
-	for i,v in pairs(self.nodes) do
-		count = count+v.joint:getFrequency();
-	end
-  return count/#self.nodes
-end
-
-function Sbody:setDamping(d)
+function Softbody:setDamping(d)
 	for i,v in pairs(self.nodes) do
 		v.joint:setDampingRatio(d);
 	end
 end
 
-function Sbody:draw(type, width)
-	if not self.dead then
-		if not width then
-			width = 20;
-		end
-    
-    self:update() --update tessellation
-
-		love.graphics.setLineStyle("smooth");
-		love.graphics.setLineWidth(width);
-
-		if type == "line" then
-			love.graphics.polygon("line", self.tess[#self.tess]);
-		else
-			love.graphics.polygon("fill", self.tess[#self.tess]);
-			love.graphics.polygon("line", self.tess[#self.tess]);
-		end
+function Softbody:setFriction(f)
+	for i,v in ipairs(self.nodes) do
+		v.fixture:setFriction(0);
 	end
-  love.graphics.setLineWidth(1)
 end
 
-function Sbody:getPoints()
- return self.tess[#self.tess]
+function Softbody:getPoints()
+	return self.tess[#self.tess];
+end
+
+function Softbody:draw(type, debug)
+	if self.dead then
+		return;
+	end
+
+	love.graphics.setLineStyle("smooth");
+	love.graphics.setLineWidth(self.nodeShape:getRadius()*2);
+
+	if type == "line" then
+		love.graphics.polygon("line", self.tess[#self.tess]);
+	else
+		love.graphics.polygon("fill", self.tess[#self.tess]);
+		love.graphics.polygon("line", self.tess[#self.tess]);
+	end
+
+	love.graphics.setLineWidth(1);
+
+	if debug then
+    local colorNow = {love.graphics.getColor()}
+    love.graphics.setColor(255,255,255,255)
+		for i,v in ipairs(self.nodes) do
+			love.graphics.circle("line", v.body:getX(), v.body:getY(), self.nodeShape:getRadius());
+		end
+    love.graphics.setColor(colorNow)
+	end
 end
 
 --tessellate function by Amadiro/Jonathan Ringstad
