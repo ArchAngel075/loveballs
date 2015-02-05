@@ -44,9 +44,10 @@ function Softbody:constructNodes(x, y, r)
 		
 		local posx = x+r*math.cos(angle);
 		local posy = y+r*math.sin(angle);
-    posx, posy = self:rayCastNode(posx,posy,r,angle)
 
 		local b = love.physics.newBody(world, posx, posy, "dynamic");
+    local reX,reY = self:rayCastNode(posx,posy,r,angle)
+    
 		b:setAngularDamping(50);
 		
 		local f = love.physics.newFixture(b, self.nodeShape);
@@ -55,7 +56,7 @@ function Softbody:constructNodes(x, y, r)
 		local j = love.physics.newDistanceJoint(self.centerBody, b, posx, posy, posx, posy, false);
 		j:setDampingRatio(0.1);
 		j:setFrequency(12*(20/r));
-
+    b:setPosition(reX,reY)
 		table.insert(self.nodes, {body = b, fixture = f, joint = j});
 	end
 
