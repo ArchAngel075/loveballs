@@ -205,6 +205,7 @@ function Softbody:setRadius(r)
 		self.nodes[i] = nil;
 	end
   
+  self.centerfixture:getShape():setRadius(r/4)
   self.centerShape:setRadius(r/4)
   
   self:constructNodes(self.centerBody:getX(), self.centerBody:getY(), r)
